@@ -2,6 +2,7 @@
 from pynagios import Plugin, make_option, Response, CRITICAL, UNKNOWN
 from base_rabbit_check import BaseRabbitCheck
 import json
+import urllib
 
 class RabbitAllQueuesCheck(BaseRabbitCheck):
 
@@ -16,6 +17,7 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 self.url = "https://%s:%s/api/queues/%s" % (self.options.hostname, self.options.port, self.options.vhost)
             else:
                 self.url = "http://%s:%s/api/queues/%s" % (self.options.hostname, self.options.port, self.options.vhost)
+            self.url = urllib.urlencode(self.url)
             return True
         except Exception, e:
             self.rabbit_error = 3
@@ -28,6 +30,7 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 self.url = "https://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, queueName)
             else:
                 self.url = "http://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, queueName)
+            self.url = urllib.urlencode(self.url)
             return True
         except Exception, e:
             self.rabbit_error = 3
