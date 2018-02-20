@@ -17,7 +17,6 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 self.url = "https://%s:%s/api/queues/%s" % (self.options.hostname, self.options.port, self.options.vhost)
             else:
                 self.url = "http://%s:%s/api/queues/%s" % (self.options.hostname, self.options.port, self.options.vhost)
-            self.url = urllib.urlencode(self.url)
             return True
         except Exception, e:
             self.rabbit_error = 3
@@ -26,11 +25,11 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
 
     def generateQueueUrl(self, queueName):
         try:
+            encodedName = urllib.quote(queueName)
             if self.options.use_ssl is True:
-                self.url = "https://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, queueName)
+                self.url = "https://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, encodedName)
             else:
-                self.url = "http://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, queueName)
-            self.url = urllib.urlencode(self.url)
+                self.url = "http://%s:%s/api/queues/%s/%s" % (self.options.hostname, self.options.port, self.options.vhost, encodedName)
             return True
         except Exception, e:
             self.rabbit_error = 3
