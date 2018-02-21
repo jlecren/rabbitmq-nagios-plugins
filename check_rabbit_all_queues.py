@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-from pynagios import Plugin, make_option, Response, CRITICAL, UNKNOWN
+from pynagios import Plugin, make_option, Response, OK, WARNING, CRITICAL, UNKNOWN
 from base_rabbit_check import BaseRabbitCheck
 import json
+import re
 import urllib
 
 class RabbitAllQueuesCheck(BaseRabbitCheck):
 
     vhost = make_option("--vhost", dest="vhost", help="RabbitMQ vhost", type="string", default='%2F')
+    pattern = make_option("--pattern", dest="pattern", help="RabbitMQ queue pattern", type="string", default='.*')
 
     def makeUrl(self):
         """
@@ -44,27 +46,40 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
             return False
         return True
 
-    def parseResult(self, data):
-            if data.get('messages'):
-                    result = self.response_for_value(data['messages'])
-                    result.message = ' found ' + str(data['messages']) + ' messages'
-                    self.rabbit_note = ' found ' + str(data['messages']) + ' messages'
-            else:
-                    result = self.response_for_value(0)
-                    result.message = ' No messages found in queue'
-                    self.rabbit_note = result.message
-            return result
+    def parseResult(self, data, result):
+        value = None
+        message = None
+        if data.get('messages'):
+            value = data['messages']
+            message = ' found ' + str(value) + ' messages'
+        else:
+            value = 0
+            message = ' No messages found in queue'
+            
+        status = OK
+        if self.options.critical is not None and self.options.critical.in_range(value):
+            status = CRITICAL
+        elif self.options.warning is not None and self.options.warning.in_range(value):
+            status = WARNING
+
+        if result is None:
+            result = Response(status, message)
+        elif result.status.exit_code < status.exit_code:
+            result.status = status
+            result.message = message
+        self.rabbit_note = result.message
+        return result
 
     def setPerformanceData(self, data, result, queue):
 
         if data.get('messages'):
-                result.set_perf_data(queue + ".messages", data['messages'], warn=self.options.warning, crit=self.options.critical)
-                result.set_perf_data(queue + ".rate", data['messages_details']['rate'])
-                result.set_perf_data(queue + ".consumers", data['consumers'], crit='0')
+            result.set_perf_data(queue + ".messages", data['messages'], warn=self.options.warning, crit=self.options.critical)
+            result.set_perf_data(queue + ".rate", data['messages_details']['rate'])
+            result.set_perf_data(queue + ".consumers", data['consumers'], crit='0')
         else:
-                result.set_perf_data(queue + ".messages", 0, warn=self.options.warning, crit=self.options.critical)
-                result.set_perf_data(queue + ".rate", 0)
-                result.set_perf_data(queue + ".consumers", data['consumers'], crit='0')
+            result.set_perf_data(queue + ".messages", 0, warn=self.options.warning, crit=self.options.critical)
+            result.set_perf_data(queue + ".rate", 0)
+            result.set_perf_data(queue + ".consumers", data['consumers'], crit='0')
 
         return result
 
@@ -86,8 +101,12 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 return Response(UNKNOWN, "Error with URL")
 
             response = self.parseJson(self.doApiGet())
-
+            queueMatcher = re.compile(self.options.pattern)
+            result = None
             for queue in response: 
+                if queueMatcher.match(queue["name"]) is None:
+                    continue
+
                 self.generateQueueUrl(queue["name"])
 
                 if self.rabbit_error > 0:
@@ -98,11 +117,12 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 if self.rabbit_error > 0:
                     return Response(CRITICAL, self.rabbit_note)
 
-                result = self.parseResult(data)
+                result = self.parseResult(data, result)
 
                 self.setPerformanceData(data, result, queue["name"])
-                print result
+            print result
         except Exception as e:
+            print str(e)
             return Response(UNKNOWN, "Error occurred:" + str(e))
 
 
