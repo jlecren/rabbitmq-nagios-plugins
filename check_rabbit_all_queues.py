@@ -101,6 +101,10 @@ class RabbitAllQueuesCheck(BaseRabbitCheck):
                 return Response(UNKNOWN, "Error with URL")
 
             response = self.parseJson(self.doApiGet())
+
+            if response is None:
+                return Response(UNKNOWN, "The server did not respond")
+
             queueMatcher = re.compile(self.options.pattern)
             result = None
             for queue in response: 
